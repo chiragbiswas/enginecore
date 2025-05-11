@@ -13,7 +13,6 @@ async fn main() {
         stream_coinbase_prices(tx).await;
     });
 
-    // Optional: keep main alive
     loop {
         tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
     }
