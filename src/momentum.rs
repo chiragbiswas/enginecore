@@ -41,11 +41,7 @@ impl MomentumStrategy {
         let newest = self.window[self.window.len() - 1];
         let change = newest - oldest;
     
-        println!(
-            "Momentum check: {:.2} → {:.2}, Δ = {:.4}, threshold = {:.4}",
-            oldest, newest, change, self.threshold
-        );
-    
+        
         if change > self.threshold {
             println!("→ BUY");
             Action::Buy
