@@ -1,27 +1,37 @@
-use rand::Rng;
+use reqwest::Client;
+use serde::Deserialize;
 
-pub struct Market {
-    pub base_price: f64,
+#[derive(Debug, Deserialize)]
+struct Trade {
+    p: f64, // last trade price
 }
 
-impl Market {
-    pub fn new(base_price: f64) -> Self {
-        Self { base_price }
-    }
+#[derive(Debug, Deserialize)]
+struct TradeResponse {
+    trade: Trade,
+}
 
-    pub fn next_tick(&mut self) -> (f64, f64) {
-        let mut rng = rand::thread_rng();
+pub async fn get_trade_price(
+    symbol: &str,
+    client: &Client,
+    api_key: &str,
+    secret: &str,
+) -> Option<f64> {
+    let url = format!(
+        "https://data.alpaca.markets/v2/stocks/{}/trades/latest",
+        symbol
+    );
 
-        //simulate small price movements
-        let spread = rng.gen_range(0.2..0.5);
-        let mid_price_change = rng.gen_range(-0.5..0.5);
-        self.base_price += mid_price_change;
+    let res = client
+        .get(&url)
+        .header("APCA-API-KEY-ID", api_key)
+        .header("APCA-API-SECRET-KEY", secret)
+        .send()
+        .await
+        .ok()?;
 
-        let bid = (self.base_price - spread / 2.0).max(1.0);
-        let ask = (self.base_price + spread / 2.0).max(bid + 0.01); // ensure ask > bid
-
-        (bid, ask)
-    }
+    let json: TradeResponse = res.json().await.ok()?;
+    Some(json.trade.p)
 }
 
 

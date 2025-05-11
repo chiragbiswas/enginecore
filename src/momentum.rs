@@ -25,25 +25,35 @@ impl MomentumStrategy {
 
     pub fn update(&mut self, latest_bid: f64) -> Action {
         self.window.push(latest_bid);
-
-        //keep only the most recent N values
+    
         if self.window.len() > self.max_len {
             self.window.remove(0);
         }
-
-        if self.window.len() < 2 {
+    
+        println!("Current window: {:?}", self.window);
+    
+        if self.window.len() < self.max_len {
+            println!("Holding — window not full yet.");
             return Action::Hold;
         }
-
-        let prev = self.window[self.window.len() - 2];
-        let curr = self.window[self.window.len() - 1];
-        let change = curr - prev;
-
+    
+        let oldest = self.window[0];
+        let newest = self.window[self.window.len() - 1];
+        let change = newest - oldest;
+    
+        println!(
+            "Momentum check: {:.2} → {:.2}, Δ = {:.4}, threshold = {:.4}",
+            oldest, newest, change, self.threshold
+        );
+    
         if change > self.threshold {
+            println!("→ BUY");
             Action::Buy
         } else if change < -self.threshold {
+            println!("→ SELL");
             Action::Sell
         } else {
+            println!("→ HOLD");
             Action::Hold
         }
     }

@@ -4,46 +4,57 @@ mod exchange;
 mod market;
 mod momentum;
 
-use exchange::{Position, Trade};
+use dotenvy::dotenv;
+use std::env;
+use market::get_trade_price;
+use reqwest::Client;
+use exchange::{Position};
 use momentum::{MomentumStrategy, Action};
-use market::Market;
-use std::{thread, time::Duration};
-fn main() {
-    let mut ob = order_book::OrderBook::new();
-    let mut market = Market::new(100.0);
-    let mut strat = MomentumStrategy::new(10, 0.3);
+use order_book::OrderBook;
+
+#[tokio::main]
+async fn main() {
+    dotenv().ok();
+
+    let api_key = env::var("ALPACA_API_KEY").expect("Missing API key");
+    let secret = env::var("ALPACA_SECRET_KEY").expect("Missing secret");
+    let client = Client::new();
+
+    let mut ob = OrderBook::new();
+    let mut strat = MomentumStrategy::new(2, 0.001);
     let mut position = Position::new();
+    let quantity = 1.0;
 
-    for _ in 0..1000 {
-        let (bid, ask) = market.next_tick();
-        ob.bids.clear();
-        ob.asks.clear();
-   
-        ob.update_bid(bid, 10.0);
-        ob.update_ask(ask, 5.0);
+    for _ in 0..10 {
+        if let Some((price)) = get_trade_price("AAPL", &client, &api_key, &secret).await {
+            ob.bids.clear();
+            ob.asks.clear();
+            ob.update_bid(price, 10.0);
+            ob.update_ask(price + 0.01, 5.0);
 
-        let action = strat.update(bid);
-        let quantity = 1.0;
-        if let Some(trade) = position.execute(action.clone(), bid, quantity)
- {
+            let action = strat.update(price);
+            println!("Strategy decision: {:?}", action);
+
+            if let Some(trade) = position.execute(action.clone(), price, quantity) {
+                println!(
+                    "Executed {:?} at ${:.2} for {:.0} units",
+                    trade.action, trade.price, trade.quantity
+                );
+            } else if matches!(action, Action::Sell) {
+                println!("Tried to SELL but insufficient quantity.");
+            }
+
             println!(
-                "Executed {:?} at ${:.2} for {:.0} units",
-                trade.action, trade.price, trade.quantity
+                "Position: {:.1} units @ avg ${:.2} | Realized P&L: ${:.2} | Unrealized P&L: ${:.2}",
+                position.quantity,
+                position.avg_cost,
+                position.realized_pnl,
+                position.unrealized_pnl(price),
             );
-        } else if matches!(action, Action::Sell) {
-            println!("Tried to SELL but insufficient quantity.");
+        } else {
+            println!("Failed to fetch quote.");
         }
-    
-        println!(
-            "Position: {:.1} units @ avg ${:.2} | Realized P&L: ${:.2} | Unrealized P&L: ${:.2}",
-            position.quantity,
-            position.avg_cost,
-            position.realized_pnl,
-            position.unrealized_pnl(bid),
-        );
-    
 
-
-        thread::sleep(Duration::from_millis(500)); //simulate time passing
+        tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
     }
 }
